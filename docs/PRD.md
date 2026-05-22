@@ -822,11 +822,22 @@ flowchart LR
 
 ## 17. AI & Intelligence
 
+### Provider AI
+
+Platform menggunakan **free tier AI providers** via Vercel AI SDK v4 — tidak bergantung pada satu provider. Provider dapat diganti tanpa mengubah kode bisnis.
+
+| Provider  | Model                   | Free Tier Limit   | Digunakan untuk           |
+| --------- | ----------------------- | ----------------- | ------------------------- |
+| Groq      | llama-3.3-70b-versatile | 14.400 req/hari   | Task analysis (primary)   |
+| Mistral   | mistral-small-latest    | ~1 req/detik      | Fallback + structured out |
+| Cerebras  | llama3.1-70b            | Free tier         | Scope guard (butuh cepat) |
+| Google    | gemini-1.5-flash        | 1.500 req/hari    | Fallback terakhir         |
+
 ### Analisis Kesulitan Tugas
 
-Saat customer submit deskripsi order, sistem memanggil Claude API untuk menganalisis:
+Saat customer submit deskripsi order, sistem memanggil AI (Groq/Mistral) untuk menganalisis:
 
-**Input ke Claude:**
+**Input ke AI:**
 
 - Kategori & subkategori
 - Deskripsi lengkap
@@ -834,7 +845,7 @@ Saat customer submit deskripsi order, sistem memanggil Claude API untuk menganal
 - Deadline yang diminta
 - File lampiran (jika ada, kirim summary)
 
-**Output Claude (JSON terstruktur via Zod):**
+**Output AI (JSON terstruktur via Zod + `generateObject`):**
 
 ```json
 {
@@ -858,7 +869,7 @@ Tombol: [Ajukan Amendment] [Abaikan, ini hanya diskusi]
 
 ### AI Matching (pgvector)
 
-Profil keahlian worker disimpan sebagai vector embedding. Saat ada order masuk, sistem mencari worker dengan embedding paling mirip dengan deskripsi order — lebih akurat dari keyword matching biasa.
+Profil keahlian worker disimpan sebagai vector embedding. Saat ada order masuk, sistem mencari worker dengan embedding paling mirip dengan deskripsi order — lebih akurat dari keyword matching biasa. Embedding di-generate menggunakan model embedding gratis (Mistral embed / Groq).
 
 ---
 
@@ -942,7 +953,9 @@ Worker wajib centang bahwa karya adalah orisinal sebelum submit hasil.
 | Vector Search      | pgvector              | 0.8               |
 | Real-time          | Socket.io             | 4.8               |
 | Job Queue          | BullMQ                | v5                |
-| AI                 | Claude API            | claude-sonnet-4-5 |
+| AI (primary)       | Groq API              | llama-3.3-70b-versatile |
+| AI (fallback)      | Mistral API           | mistral-small-latest    |
+| AI (alternatif)    | Cerebras API          | llama3.1-70b            |
 | AI SDK             | Vercel AI SDK         | v4                |
 | Payment            | Midtrans Snap         | v3                |
 | Storage            | Cloudflare R2         | —                 |
@@ -994,7 +1007,7 @@ flowchart TD
 
     subgraph External
         MT[Midtrans\nPayment]
-        ANT[Anthropic\nClaude API]
+        ANT[Groq / Mistral\nAI Provider]
         FON[Fonnte\nWhatsApp]
         RSN[Resend\nEmail]
         NVU[Novu\nNotifications]

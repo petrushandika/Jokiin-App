@@ -14,7 +14,7 @@
 
 **Menghubungkan customer dengan worker terpercaya secara real-time — aman, transparan, dan terukur.**
 
-[🚀 Demo](#) · [📋 PRD](./PRD.md) · [🗺️ Roadmap](./ROADMAP.md) · [🏗️ Architecture](./ARCHITECTURE.md) · [🗄️ Schema](./SCHEMA.md) · [📦 MVP](./MVP.md)
+[🚀 Demo](#) · [📋 PRD](./docs/PRD.md) · [🗺️ Roadmap](./docs/ROADMAP.md) · [🏗️ Architecture](./docs/ARCHITECTURE.md) · [🗄️ Schema](./docs/SCHEMA.md) · [📦 MVP](./docs/MVP.md)
 
 </div>
 
@@ -33,20 +33,20 @@ Platform menggunakan sistem **matchmaking real-time bergaya Gojek** — customer
 
 ## ✨ Fitur Utama
 
-| Fitur                        | Deskripsi                                                   |
-| ---------------------------- | ----------------------------------------------------------- |
-| 🚀 **Matchmaking Real-time** | Broadcast Gojek-style, worker pertama accept dapat order    |
-| 🔒 **Escrow Payment**        | Dana customer aman, dilepas setelah customer approve hasil  |
-| 🤖 **AI Task Analysis**      | Claude API nilai kesulitan tugas & harga minimum otomatis   |
-| ⭐ **Reputasi Multidimensi** | 5 komponen weighted score + blind review system             |
-| 💬 **Chat per Order**        | Terisolasi, moderasi otomatis, blokir kontak eksternal      |
-| 🏆 **Badge System**          | SPROUT → SPARK → BLAZE → PRIME → APEX                       |
-| ⏱️ **Deadline Guard**        | Slot kapasitas worker, buffer otomatis, eskalasi bertahap   |
-| 💰 **Wallet Internal**       | Saldo terakumulasi, withdraw T+1 hari kerja via bank        |
-| 🛡️ **Trust System**          | Verifikasi social media, tes kemampuan, portofolio          |
-| 📝 **Custom CMS**            | Blog, halaman statis, category landing, newsletter built-in |
-| 📊 **Admin Panel**           | Dashboard lengkap, dispute resolution, moderasi konten      |
-| 🔔 **Notifikasi Omni**       | In-app, WhatsApp, Email, Web Push via Novu                  |
+| Fitur                        | Deskripsi                                                        |
+| ---------------------------- | ---------------------------------------------------------------- |
+| 🚀 **Matchmaking Real-time** | Broadcast Gojek-style, worker pertama accept dapat order         |
+| 🔒 **Escrow Payment**        | Dana customer aman, dilepas setelah customer approve hasil       |
+| 🤖 **AI Task Analysis**      | Groq/Mistral nilai kesulitan tugas & harga minimum otomatis      |
+| ⭐ **Reputasi Multidimensi** | 5 komponen weighted score + blind review system                  |
+| 💬 **Chat per Order**        | Terisolasi, moderasi otomatis, blokir kontak eksternal           |
+| 🏆 **Badge System**          | SPROUT → SPARK → BLAZE → PRIME → APEX                            |
+| ⏱️ **Deadline Guard**        | Slot kapasitas worker, buffer otomatis, eskalasi bertahap        |
+| 💰 **Wallet Internal**       | Saldo terakumulasi, withdraw T+1 hari kerja via bank             |
+| 🛡️ **Trust System**          | Verifikasi social media, tes kemampuan, portofolio               |
+| 📝 **Custom CMS**            | Blog, halaman statis, category landing, newsletter built-in      |
+| 📊 **Admin Panel**           | Dashboard lengkap, dispute resolution, moderasi konten           |
+| 🔔 **Notifikasi Omni**       | In-app, WhatsApp, Email, Web Push via Novu                       |
 
 ---
 
@@ -55,18 +55,17 @@ Platform menggunakan sistem **matchmaking real-time bergaya Gojek** — customer
 | Dokumen                              | Deskripsi                                     |
 | ------------------------------------ | --------------------------------------------- |
 | [README.md](./README.md)             | Ringkasan project, quick start, struktur      |
-| [PRD.md](./PRD.md)                   | Product Requirements Document lengkap         |
-| [MVP.md](./MVP.md)                   | Scope MVP, milestone, timeline 16 minggu      |
-| [ROADMAP.md](./ROADMAP.md)           | Roadmap Fase 1–4, fitur per fase              |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Arsitektur sistem, infrastruktur, boilerplate |
-| [SCHEMA.md](./SCHEMA.md)             | ERD, deskripsi semua tabel & kolom            |
-| [schema.ts](./schema.ts)             | Drizzle ORM schema (source of truth)          |
+| [PRD.md](./docs/PRD.md)             | Product Requirements Document lengkap         |
+| [MVP.md](./docs/MVP.md)             | Scope MVP, milestone, timeline 16 minggu      |
+| [ROADMAP.md](./docs/ROADMAP.md)     | Roadmap Fase 1–4, fitur per fase              |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Arsitektur sistem, infrastruktur, boilerplate |
+| [SCHEMA.md](./docs/SCHEMA.md)       | ERD, deskripsi semua tabel & kolom            |
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
+### Frontend (`apps/web`)
 
 | Tech             | Versi      | Fungsi                         |
 | ---------------- | ---------- | ------------------------------ |
@@ -81,7 +80,7 @@ Platform menggunakan sistem **matchmaking real-time bergaya Gojek** — customer
 | Tiptap           | v3         | Rich text editor (CMS)         |
 | Socket.io Client | v4.8       | Real-time WebSocket            |
 
-### Backend
+### Backend (`apps/api`)
 
 | Tech        | Versi   | Fungsi                              |
 | ----------- | ------- | ----------------------------------- |
@@ -113,12 +112,14 @@ Platform menggunakan sistem **matchmaking real-time bergaya Gojek** — customer
 
 ### AI & Payment
 
-| Tech                           | Fungsi                                  |
-| ------------------------------ | --------------------------------------- |
-| Claude API (claude-sonnet-4-5) | Analisis kesulitan tugas, scope guard   |
-| Vercel AI SDK v4               | Structured output + streaming           |
-| Midtrans Snap v3               | Payment gateway Indonesia               |
-| BullMQ v5                      | Job queue (deadline, broadcast, notify) |
+| Tech               | Fungsi                                         |
+| ------------------ | ---------------------------------------------- |
+| Groq API           | Inferensi LLM (Llama 3.x) — free tier, cepat  |
+| Mistral API        | Fallback AI + structured output — free tier    |
+| Cerebras API       | Alternatif inferensi ultra-cepat — free tier   |
+| Vercel AI SDK v4   | Unified AI provider wrapper + streaming        |
+| Midtrans Snap v3   | Payment gateway Indonesia                      |
+| BullMQ v5          | Job queue (deadline, broadcast, notify)        |
 
 ### Monitoring
 
@@ -136,7 +137,7 @@ Platform menggunakan sistem **matchmaking real-time bergaya Gojek** — customer
 ```
 jokiin/
 ├── apps/
-│   ├── web/                        # Next.js 16 — UI + Server Actions
+│   ├── web/                        # Next.js 16 — Frontend (UI + Server Actions)
 │   │   ├── app/
 │   │   │   ├── (auth)/             # Login, Register
 │   │   │   ├── (public)/           # Blog, Landing, Kategori
@@ -146,7 +147,7 @@ jokiin/
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   └── lib/
-│   └── api/                        # Hono v4 + Bun — REST + WebSocket
+│   └── api/                        # Hono v4 + Bun — Backend (REST + WebSocket)
 │       └── src/
 │           ├── routes/
 │           ├── middleware/
@@ -156,12 +157,12 @@ jokiin/
 │   ├── db/                         # Drizzle schema + migrations
 │   ├── types/                      # Shared TypeScript types
 │   ├── validators/                 # Zod v4 schemas
-│   └── ai/                         # Claude API wrapper
+│   └── ai/                         # AI provider wrapper (Groq/Mistral/Cerebras)
 ├── workers/
 │   ├── deadline/                   # BullMQ: timer + eskalasi
 │   ├── broadcast/                  # BullMQ: matchmaking
 │   └── notify/                     # BullMQ: Novu triggers
-├── docs/                           # Dokumentasi (folder ini)
+├── docs/                           # Semua dokumentasi
 ├── .github/
 │   └── workflows/                  # CI/CD pipelines
 ├── docker-compose.yml
@@ -176,8 +177,7 @@ jokiin/
 ### Prerequisites
 
 ```bash
-# Pastikan sudah terinstall
-bun --version    # >= 1.3.0
+bun --version    # >= 1.3.14
 docker --version # >= 24.0
 git --version
 ```
@@ -271,8 +271,12 @@ UPSTASH_REDIS_TOKEN=xxx
 BETTER_AUTH_SECRET=change-this-to-random-32-chars-minimum
 BETTER_AUTH_URL=http://localhost:3000
 
-# ─── AI ───────────────────────────────────────────────────────
-ANTHROPIC_API_KEY=sk-ant-api03-xxx
+# ─── AI (Free Tier Providers) ─────────────────────────────────
+GROQ_API_KEY=gsk_xxx                # https://console.groq.com
+MISTRAL_API_KEY=xxx                 # https://console.mistral.ai
+CEREBRAS_API_KEY=xxx                # https://cloud.cerebras.ai
+AI_PRIMARY_PROVIDER=groq            # groq | mistral | cerebras
+AI_PRIMARY_MODEL=llama-3.3-70b-versatile
 
 # ─── Payment ──────────────────────────────────────────────────
 MIDTRANS_SERVER_KEY=SB-Mid-server-xxx

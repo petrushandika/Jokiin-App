@@ -38,19 +38,30 @@ Dokumentasi lengkap ada di `docs/`:
 - **Redis 8** (Upstash) — cache, session, Pub/Sub untuk Socket.io
 - **pgvector 0.8** — vector similarity untuk AI matching (Fase 3)
 
-### AI & Payment
-- **Claude API** (`claude-sonnet-4-5`) via Vercel AI SDK v4 — analisis kesulitan tugas + scope guard
+### AI — Free Tier Providers
+Semua AI menggunakan **Vercel AI SDK v4** sebagai unified wrapper. Provider dapat diganti tanpa mengubah kode bisnis.
+
+| Provider  | Model Default              | Free Tier      | Peran                      |
+| --------- | -------------------------- | -------------- | -------------------------- |
+| Groq      | llama-3.3-70b-versatile    | 14.400 req/hari| Primary (task analysis)    |
+| Mistral   | mistral-small-latest       | ~1 req/detik   | Fallback + structured output|
+| Cerebras  | llama3.1-70b               | Free tier      | Scope guard (butuh cepat)  |
+| Google    | gemini-1.5-flash           | 1.500 req/hari | Fallback terakhir          |
+
+Gunakan `generateObject()` dari Vercel AI SDK + Zod schema untuk output terstruktur — bukan string parsing manual.
+
+### Payment & Queue
 - **Midtrans Snap v3** — payment gateway Indonesia + escrow
 - **BullMQ v5** — job queue (deadline reminders, broadcast matchmaking, notifikasi)
 
 ### Infrastructure
-- **Vercel** — deploy frontend
-- **Railway** — deploy backend + BullMQ workers
+- **Vercel** — deploy frontend (`apps/web`)
+- **Railway** — deploy backend + BullMQ workers (`apps/api`, `workers/*`)
 - **Cloudflare** — CDN, WAF, DDoS protection, R2 object storage
 - **Docker Compose** — local dev (PostgreSQL + Redis)
 - **GitHub Actions** — CI/CD
 - **Turborepo** — monorepo build pipeline
-- **Biome** — linting + formatting
+- **Biome** — linting + formatting (bukan ESLint/Prettier)
 
 ---
 
@@ -59,13 +70,13 @@ Dokumentasi lengkap ada di `docs/`:
 ```
 jokiin/
 ├── apps/
-│   ├── web/                  # Next.js 16 — UI + Server Actions
-│   └── api/                  # Hono v4 + Bun — REST + WebSocket
+│   ├── web/                  # Frontend — Next.js 16 (UI + Server Actions)
+│   └── api/                  # Backend — Hono v4 + Bun (REST + WebSocket)
 ├── packages/
 │   ├── db/                   # Drizzle schema + migrations (source of truth)
 │   ├── types/                # Shared TypeScript types
 │   ├── validators/           # Zod v4 schemas (shared frontend & backend)
-│   └── ai/                   # Claude API wrapper + prompts
+│   └── ai/                   # AI provider wrapper (Groq/Mistral/Cerebras)
 ├── workers/
 │   ├── deadline/             # BullMQ: deadline reminders + auto-approve
 │   ├── broadcast/            # BullMQ: matchmaking order broadcast
@@ -95,9 +106,9 @@ bun run db:seed             # Seed data development
 bun run db:reset            # Reset + re-migrate (hati-hati!)
 
 # Development
-bun run dev                 # Semua apps paralel
-bun run dev:web             # Web saja (localhost:3000)
-bun run dev:api             # API saja (localhost:3001)
+bun run dev                 # Semua apps paralel (web + api + workers)
+bun run dev:web             # Frontend saja (localhost:3000)
+bun run dev:api             # Backend saja (localhost:3001)
 
 # Quality
 bun run lint                # Biome check
@@ -111,13 +122,12 @@ bun run build
 ```
 
 ### Local Service URLs
-| Service | URL |
-|---|---|
-| Web (Next.js) | http://localhost:3000 |
-| API (Hono) | http://localhost:3001 |
-| Admin Panel | http://localhost:3000/admin |
-| API Docs | http://localhost:3001/docs |
-| Drizzle Studio | http://localhost:4983 |
+| Service        | URL                         |
+| -------------- | --------------------------- |
+| Web (Next.js)  | http://localhost:3000       |
+| API (Hono)     | http://localhost:3001       |
+| Admin Panel    | http://localhost:3000/admin |
+| Drizzle Studio | http://localhost:4983       |
 
 ---
 
@@ -127,13 +137,16 @@ bun run build
 Semua transaksi finansial HARUS menggunakan PostgreSQL ACID transaction + idempotency key. Jangan pernah update saldo atau status escrow tanpa database transaction. Webhook Midtrans wajib dicek idempotency sebelum diproses.
 
 ### Type-Safe End-to-End
-TypeScript strict dari database (Drizzle schema) → shared types (`packages/types`) → validator (`packages/validators`) → frontend. Jangan gunakan `any`, jangan bypass type checking.
+TypeScript strict dari database (Drizzle schema) → shared types (`packages/types`) → validator (`packages/validators`) → frontend dan backend. Jangan gunakan `any`, jangan bypass type checking.
 
 ### Real-Time First
 Socket.io + Redis Pub/Sub untuk semua interaksi yang butuh respons instan (notifikasi order, chat, countdown). Multiple Socket.io instances harus pakai Redis adapter dari awal.
 
 ### Race Condition Safety
 Order locking saat worker accept HARUS atomic (PostgreSQL SELECT FOR UPDATE atau Redis SETNX). Broadcast ke banyak worker bersamaan — hanya satu yang boleh berhasil accept.
+
+### AI Provider Agnostic
+Semua AI call HARUS melalui `packages/ai` — jangan import SDK AI langsung di `apps/api`. Gunakan `generateObject()` + Zod schema, bukan string parsing. Jika Groq rate limit, fallback ke Mistral otomatis.
 
 ---
 
@@ -190,7 +203,7 @@ Semua endpoint kritis wajib ada rate limit via Redis sliding window. Lihat `apps
 - Komisi per badge: SPROUT 15%, SPARK 13%, BLAZE 12%, PRIME 10%, APEX 8%
 
 ### Revisi
-- Kuota revisi ditentukan oleh kombinasi difficulty × waktu pengerjaan (lihat tabel di PRD)
+- Kuota revisi ditentukan oleh kombinasi difficulty × waktu pengerjaan (lihat tabel di `docs/PRD.md`)
 - Revisi berbayar setelah kuota habis: 25% dari harga order
 - Perubahan scope HARUS lewat Amendment, bukan via chat
 
@@ -236,7 +249,7 @@ chore: update dependency C
 ## MVP Scope (Fase 1)
 
 Yang masuk MVP (harus selesai sebelum launch):
-registrasi/login, OTP WhatsApp, form order + AI analisis, escrow Midtrans, matchmaking broadcast, chat per order, submit hasil + approve, revisi (kuota fix), rating dasar, badge system, wallet + withdraw, dashboard customer & worker, admin panel dasar, verifikasi worker manual.
+registrasi/login, OTP WhatsApp, form order + AI analisis (Groq/Mistral), escrow Midtrans, matchmaking broadcast, chat per order, submit hasil + approve, revisi (kuota fix), rating dasar, badge system, wallet + withdraw, dashboard customer & worker, admin panel dasar, verifikasi worker manual.
 
 Yang **tidak** masuk MVP (jangan build dulu):
 explore worker, blind review, amendment system, scope guard AI di chat, pgvector matching, CMS blog editor, customer loyalty, voucher, referral.
@@ -246,11 +259,48 @@ explore worker, blind review, amendment system, scope guard AI di chat, pgvector
 ## Environment Variables
 
 Lihat `.env.example` untuk daftar lengkap. Variabel kritis:
-- `DATABASE_URL` + `DATABASE_URL_READONLY`
-- `REDIS_URL`
-- `BETTER_AUTH_SECRET` (min 32 karakter random)
-- `ANTHROPIC_API_KEY`
-- `MIDTRANS_SERVER_KEY` + `MIDTRANS_CLIENT_KEY` + `MIDTRANS_WEBHOOK_SECRET`
-- `CLOUDFLARE_R2_*`
-- `FONNTE_TOKEN` (WhatsApp OTP)
-- `CRON_SECRET` (BullMQ worker auth)
+
+```env
+# Database
+DATABASE_URL=postgresql://jokiin:secret@localhost:5432/jokiin_dev
+DATABASE_URL_READONLY=postgresql://jokiin:secret@localhost:5432/jokiin_dev
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Auth
+BETTER_AUTH_SECRET=change-this-to-random-32-chars-minimum
+
+# AI (Free Tier — pilih minimal satu)
+GROQ_API_KEY=gsk_xxx            # https://console.groq.com (utama)
+MISTRAL_API_KEY=xxx             # https://console.mistral.ai (fallback)
+CEREBRAS_API_KEY=xxx            # https://cloud.cerebras.ai (alternatif)
+AI_PRIMARY_PROVIDER=groq        # groq | mistral | cerebras
+AI_PRIMARY_MODEL=llama-3.3-70b-versatile
+
+# Payment
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxx
+MIDTRANS_WEBHOOK_SECRET=xxx
+MIDTRANS_IS_PRODUCTION=false
+
+# Storage
+CLOUDFLARE_R2_ACCOUNT_ID=xxx
+CLOUDFLARE_R2_ACCESS_KEY_ID=xxx
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=xxx
+CLOUDFLARE_R2_BUCKET_NAME=jokiin-dev
+CLOUDFLARE_R2_PUBLIC_URL=https://pub-xxx.r2.dev
+
+# Notifications
+FONNTE_TOKEN=xxx
+RESEND_API_KEY=re_xxx
+NOVU_API_KEY=xxx
+
+# Monitoring
+SENTRY_DSN=https://xxx@sentry.io/xxx
+BETTER_STACK_SOURCE_TOKEN=xxx
+
+# Internal
+CRON_SECRET=xxx
+ADMIN_PANEL_ALLOWED_IPS=127.0.0.1
+```

@@ -83,7 +83,7 @@ gantt
 ### 1.2 Core Order & Escrow (Minggu 4–7)
 
 - 📋 Form order terstruktur (semua field + validasi Zod)
-- 📋 Integrasi Claude API: analisis kesulitan → skor + harga minimum
+- 📋 Integrasi AI (Groq/Mistral via Vercel AI SDK): analisis kesulitan → skor + harga minimum
 - 📋 Validasi budget: warning jika di bawah minimum platform
 - 📋 Midtrans Snap v3: inisiasi payment
 - 📋 Webhook Midtrans dengan idempotency key + signature verification

@@ -28,7 +28,7 @@ JokiIn dibangun dengan arsitektur **modular monorepo** yang memisahkan concern s
 - **Type-safe end-to-end** — TypeScript dari database (Drizzle) sampai UI (Next.js), shared via packages
 - **Real-time first** — Socket.io + Redis Pub/Sub untuk semua interaksi yang butuh respons instan
 - **Escrow-safe** — Semua transaksi finansial menggunakan PostgreSQL ACID + idempotency keys
-- **AI-augmented** — Claude API untuk intelligence, bukan gimmick
+- **AI-augmented** — Free AI (Groq/Mistral/Cerebras) untuk intelligence via Vercel AI SDK
 - **Edge-ready** — Cloudflare di semua lapis, Hono kompatibel dengan edge runtime
 
 ---
@@ -69,7 +69,7 @@ flowchart TD
 
     subgraph External["🔌 External Services"]
         MT[Midtrans\nPayment]
-        ANT[Anthropic\nClaude API]
+        ANT[Groq / Mistral\nAI Provider]
         FON[Fonnte\nWhatsApp OTP]
         RSN[Resend\nEmail]
         NVU[Novu\nNotifications]
@@ -108,7 +108,7 @@ jokiin/
 │   ├── db/                     # Drizzle schema + client
 │   ├── types/                  # Shared TypeScript types
 │   ├── validators/             # Zod schemas
-│   └── ai/                     # Claude API wrapper
+│   └── ai/                     # AI provider wrapper (Groq/Mistral/Cerebras)
 ├── workers/
 │   ├── deadline/               # Deadline timer worker
 │   ├── broadcast/              # Matchmaking worker
@@ -458,7 +458,7 @@ apps/api/
 │   ├── services/
 │   │   ├── matchmaking.ts            # Broadcast logic + eligibility filter
 │   │   ├── escrow.ts                 # Hold, release, refund
-│   │   ├── ai.ts                     # Claude API calls
+│   │   ├── ai.ts                     # AI provider calls (Groq/Mistral/Cerebras)
 │   │   ├── notification.ts           # Novu trigger wrapper
 │   │   ├── withdraw.ts               # Withdraw processing
 │   │   ├── reputation.ts             # Score recalculation
@@ -685,20 +685,58 @@ Idle timeout    : 10 detik
 
 ## 8. AI Architecture
 
+### Provider Strategy
+
+Platform menggunakan **free tier AI providers** via Vercel AI SDK. Provider dipilih berdasarkan ketersediaan dan kecepatan, dengan fallback otomatis.
+
+| Provider  | Model Default              | Free Tier Limit      | Keunggulan            |
+| --------- | -------------------------- | -------------------- | --------------------- |
+| Groq      | llama-3.3-70b-versatile    | 14.400 req/hari      | Tercepat (inferensi)  |
+| Mistral   | mistral-small-latest       | 1 req/detik gratis   | Structured output     |
+| Cerebras  | llama3.1-70b               | Free tier tersedia   | Ultra-cepat           |
+| Google    | gemini-1.5-flash           | 1.500 req/hari       | Multimodal (gambar)   |
+
+**Primary:** Groq (kecepatan). **Fallback:** Mistral → Cerebras → Google Gemini.
+
+### Provider Setup (`packages/ai/index.ts`)
+
+```typescript
+import { createGroq } from "@ai-sdk/groq";
+import { createMistral } from "@ai-sdk/mistral";
+import { createCerebras } from "@ai-sdk/cerebras";
+
+export const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
+export const mistral = createMistral({ apiKey: process.env.MISTRAL_API_KEY });
+export const cerebras = createCerebras({ apiKey: process.env.CEREBRAS_API_KEY });
+
+// Model yang dipakai
+export const models = {
+  primary: groq("llama-3.3-70b-versatile"),
+  fallback: mistral("mistral-small-latest"),
+  fast: cerebras("llama3.1-70b"),
+};
+```
+
 ### Task Analysis Flow
 
 ```mermaid
 sequenceDiagram
     participant FE as Next.js
     participant API as Hono API
-    participant AI as Claude API
+    participant AI as Groq / Mistral API
+    participant RD as Redis
     participant DB as PostgreSQL
 
     FE->>API: POST /orders/analyze { description, category, deadline, budget }
-    API->>AI: messages: [{role: user, content: prompt}]
-    Note over AI: Analisis kesulitan,\nestimasi waktu,\nharga minimum
-    AI->>API: Structured JSON output (via Zod schema)
-    API->>DB: Cache hasil di Redis (TTL 5 menit)
+    API->>RD: Cek cache (key: hash deskripsi)
+    alt Cache hit
+        RD->>API: Return cached result
+    else Cache miss
+        API->>AI: generateObject() dengan Zod schema
+        Note over AI: Analisis kesulitan,\nestimasi waktu,\nharga minimum
+        AI->>API: Structured JSON output (validated by Zod)
+        API->>RD: Cache hasil (TTL 5 menit)
+    end
     API->>FE: { difficultyScore, estimatedHours, minimumPrice, warnings }
 ```
 
@@ -706,9 +744,27 @@ sequenceDiagram
 
 ```typescript
 // packages/ai/prompts/taskAnalysis.ts
-export const taskAnalysisPrompt = (input: TaskAnalysisInput) => `
+import { generateObject } from "ai";
+import { z } from "zod";
+import { models } from "../index";
+
+const TaskAnalysisSchema = z.object({
+  difficultyScore: z.number().int().min(1).max(5),
+  difficultyReason: z.string(),
+  estimatedHours: z.number(),
+  minimumPrice: z.number(),
+  suggestedPrice: z.number(),
+  maxRevisions: z.number().int().min(1).max(4),
+  warnings: z.array(z.string()),
+});
+
+export async function analyzeTask(input: TaskAnalysisInput) {
+  const { object } = await generateObject({
+    model: models.primary,
+    schema: TaskAnalysisSchema,
+    prompt: `
 Kamu adalah sistem analisis tugas akademik dan profesional.
-Analisis tugas berikut dan berikan output dalam format JSON.
+Analisis tugas berikut dan berikan estimasi yang akurat.
 
 TUGAS:
 - Kategori: ${input.category}
@@ -716,34 +772,40 @@ TUGAS:
 - Jumlah halaman/soal: ${input.pageCount ?? "tidak disebutkan"}
 - Deadline: ${input.deadline} (${input.hoursUntilDeadline} jam dari sekarang)
 
-OUTPUT (JSON):
-{
-  "difficultyScore": <1-5>,
-  "difficultyReason": "<alasan singkat>",
-  "estimatedHours": <angka>,
-  "minimumPrice": <angka dalam Rupiah>,
-  "suggestedPrice": <angka dalam Rupiah>,
-  "maxRevisions": <1-4>,
-  "warnings": ["<warning jika ada>"]
-}
-
 Harga minimum berdasarkan: kesulitan × estimasi jam × Rp 25.000/jam.
-`;
+    `.trim(),
+  });
+
+  return object; // Sudah tervalidasi Zod, type-safe
+}
 ```
 
 ### Scope Guard
 
 ```typescript
 // packages/ai/prompts/scopeGuard.ts
-export const scopeGuardPrompt = (message: string, originalDesc: string) => `
+import { generateObject } from "ai";
+import { z } from "zod";
+import { models } from "../index";
+
+export async function checkScope(message: string, originalDesc: string) {
+  const { object } = await generateObject({
+    model: models.fast, // Pakai model tercepat untuk real-time chat
+    schema: z.object({
+      isNewScope: z.boolean(),
+      reason: z.string(),
+    }),
+    prompt: `
 Bandingkan pesan chat ini dengan deskripsi order asli.
 Apakah pesan mengandung permintaan BARU yang tidak ada di deskripsi asli?
 
 DESKRIPSI ASLI: ${originalDesc}
 PESAN BARU: ${message}
+    `.trim(),
+  });
 
-OUTPUT: { "isNewScope": boolean, "reason": string }
-`;
+  return object;
+}
 ```
 
 ---

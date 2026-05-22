@@ -21,7 +21,7 @@
 | Registrasi customer & worker             | ✅  |        |        |
 | OTP WhatsApp                             | ✅  |        |        |
 | Buat order (form terstruktur)            | ✅  |        |        |
-| AI analisis kesulitan (Claude API)       | ✅  |        |        |
+| AI analisis kesulitan (Groq/Mistral)    | ✅  |        |        |
 | Matchmaking broadcast Gojek-style        | ✅  |        |        |
 | Escrow Midtrans (hold & release)         | ✅  |        |        |
 | Chat per order                           | ✅  |        |        |
@@ -131,7 +131,7 @@ gantt
 **Deliverable:**
 
 - [ ] Form order terstruktur (semua field wajib + opsional)
-- [ ] Integrasi Claude API: analisis kesulitan → skor + harga minimum
+- [ ] Integrasi AI (Groq/Mistral via Vercel AI SDK): analisis kesulitan → skor + harga minimum
 - [ ] Validasi budget: warning jika di bawah minimum
 - [ ] Integrasi Midtrans Snap: inisiasi payment
 - [ ] Webhook handler Midtrans dengan idempotency key
@@ -324,7 +324,7 @@ apps/api/
 │   ├── services/
 │   │   ├── matchmaking.ts
 │   │   ├── escrow.ts
-│   │   ├── ai.ts          ← Claude API calls
+│   │   ├── ai.ts          ← AI provider calls (Groq/Mistral)
 │   │   ├── notification.ts
 │   │   └── withdraw.ts
 │   ├── socket/
@@ -420,8 +420,11 @@ REDIS_URL=redis://localhost:6379
 BETTER_AUTH_SECRET=change-this-to-random-32-chars
 BETTER_AUTH_URL=http://localhost:3000
 
-# AI
-ANTHROPIC_API_KEY=sk-ant-...
+# AI (Free Tier)
+GROQ_API_KEY=gsk_xxx
+MISTRAL_API_KEY=xxx
+CEREBRAS_API_KEY=xxx
+AI_PRIMARY_PROVIDER=groq
 
 # Payment
 MIDTRANS_SERVER_KEY=SB-Mid-server-...
