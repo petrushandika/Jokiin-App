@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-import { redis } from "../lib/redis";
-import { err } from "../lib/response";
+import { redis } from "../lib/redis.ts";
+import { err } from "../lib/response.ts";
 
 interface RateLimitOptions {
   max: number;

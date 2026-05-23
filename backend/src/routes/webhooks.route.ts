@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { rateLimit } from "../middlewares/rateLimit";
-import * as escrowService from "../services/escrow.service";
-import * as matchmakingService from "../services/matchmaking.service";
-import { ok, err } from "../lib/response";
+import { rateLimit } from "../middlewares/rateLimit.ts";
+import * as escrowService from "../services/escrow.service.ts";
+import * as matchmakingService from "../services/matchmaking.service.ts";
+import { ok, err } from "../lib/response.ts";
 
 const webhooks = new Hono();
 
@@ -17,7 +17,7 @@ webhooks.post(
 
       // Jika payment berhasil, mulai broadcast matchmaking
       if (result.message === "Payment confirmed") {
-        const escrow = await import("../lib/database").then(({ db }) =>
+        const escrow = await import("../lib/database.ts").then(({ db }) =>
           db.query.escrowTransactions.findFirst({
             where: (t, { eq }) => eq(t.idempotency_key, payload.order_id),
           })

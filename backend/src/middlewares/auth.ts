@@ -1,10 +1,10 @@
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { eq } from "drizzle-orm";
-import { db } from "../lib/database";
-import { sessions } from "../../database/schema";
-import { err } from "../lib/response";
-import type { AppVariables } from "../lib/context";
+import { db } from "../lib/database.ts";
+import { sessions } from "../../database/schema.ts";
+import { err } from "../lib/response.ts";
+import type { AppVariables } from "../lib/context.ts";
 
 export const requireAuth = createMiddleware<{ Variables: AppVariables }>(async (c, next) => {
   const token =

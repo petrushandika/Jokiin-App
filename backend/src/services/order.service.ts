@@ -1,9 +1,9 @@
 import { eq, and, desc } from "drizzle-orm";
-import { db, dbRead } from "../lib/database";
-import { orders, escrowTransactions } from "../../database/schema";
-import { reputationQueue } from "../lib/queue";
-import { analyzeTask } from "./ai.service";
-import { categories } from "../../database/schema";
+import { db, dbRead } from "../lib/database.ts";
+import { orders, escrowTransactions } from "../../database/schema.ts";
+import { reputationQueue } from "../lib/queue.ts";
+import { analyzeTask } from "./ai.service.ts";
+import { categories } from "../../database/schema.ts";
 
 // ─── Analyze (AI) ─────────────────────────────────────────────────────────────
 

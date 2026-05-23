@@ -1,6 +1,6 @@
 import { eq, asc } from "drizzle-orm";
-import { db, dbRead } from "../lib/database";
-import { chats, messages, orders } from "../../database/schema";
+import { db, dbRead } from "../lib/database.ts";
+import { chats, messages, orders } from "../../database/schema.ts";
 
 // ─── Patterns yang diblokir ───────────────────────────────────────────────────
 

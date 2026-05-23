@@ -1,4 +1,4 @@
-import type { users } from "../../database/schema";
+import type { users } from "../../database/schema.ts";
 
 export type AppUser = typeof users.$inferSelect;
 

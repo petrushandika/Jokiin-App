@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth, requireRole } from "../middlewares/auth";
-import { rateLimit } from "../middlewares/rateLimit";
-import * as walletService from "../services/wallet.service";
-import { ok, err } from "../lib/response";
+import { requireAuth, requireRole } from "../middlewares/auth.ts";
+import { rateLimit } from "../middlewares/rateLimit.ts";
+import * as walletService from "../services/wallet.service.ts";
+import { ok, err } from "../lib/response.ts";
 
 const wallets = new Hono();
 

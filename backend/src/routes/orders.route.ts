@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth, requireRole } from "../middlewares/auth";
-import { rateLimit } from "../middlewares/rateLimit";
-import * as orderService from "../services/order.service";
-import * as escrowService from "../services/escrow.service";
-import * as matchmakingService from "../services/matchmaking.service";
-import { ok, err } from "../lib/response";
+import { requireAuth, requireRole } from "../middlewares/auth.ts";
+import { rateLimit } from "../middlewares/rateLimit.ts";
+import * as orderService from "../services/order.service.ts";
+import * as escrowService from "../services/escrow.service.ts";
+import * as matchmakingService from "../services/matchmaking.service.ts";
+import { ok, err } from "../lib/response.ts";
 
 const orders = new Hono();
 

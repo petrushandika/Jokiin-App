@@ -1,6 +1,6 @@
 import { eq, avg, count, and } from "drizzle-orm";
-import { db } from "../lib/database";
-import { workerProfiles, reviews, orders, penalties, users } from "../../database/schema";
+import { db } from "../lib/database.ts";
+import { workerProfiles, reviews, orders, penalties, users } from "../../database/schema.ts";
 
 // ─── Recalculate Reputation ────────────────────────────────────────────────────
 

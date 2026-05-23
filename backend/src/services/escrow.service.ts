@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../lib/database";
-import { orders, escrowTransactions, wallets, walletTransactions } from "../../database/schema";
+import { db } from "../lib/database.ts";
+import { orders, escrowTransactions, wallets, walletTransactions } from "../../database/schema.ts";
 import * as crypto from "crypto";
 
 const MIDTRANS_BASE_URL = process.env.MIDTRANS_IS_PRODUCTION === "true"

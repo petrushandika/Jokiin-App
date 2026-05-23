@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { err } from "../lib/response";
+import { err } from "../lib/response.ts";
 
 export const errorHandler = (error: Error, c: Context) => {
   console.error("[Error]", error.message, error.stack);

@@ -1,7 +1,7 @@
 import { eq, and, gt } from "drizzle-orm";
-import { db } from "../lib/database";
-import { users, sessions, otpCodes, wallets } from "../../database/schema";
-import { redis } from "../lib/redis";
+import { db } from "../lib/database.ts";
+import { users, sessions, otpCodes, wallets } from "../../database/schema.ts";
+import { redis } from "../lib/redis.ts";
 import * as argon2 from "argon2";
 import * as crypto from "crypto";
 

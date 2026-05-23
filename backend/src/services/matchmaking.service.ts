@@ -1,8 +1,8 @@
 import { eq, and, sql } from "drizzle-orm";
-import { db, dbRead } from "../lib/database";
-import { orders, workerProfiles, workerCategoryScores, broadcastLogs } from "../../database/schema";
-import { broadcastQueue } from "../lib/queue";
-import { redis } from "../lib/redis";
+import { db, dbRead } from "../lib/database.ts";
+import { orders, workerProfiles, workerCategoryScores, broadcastLogs } from "../../database/schema.ts";
+import { broadcastQueue } from "../lib/queue.ts";
+import { redis } from "../lib/redis.ts";
 
 // ─── Start Broadcast ──────────────────────────────────────────────────────────
 

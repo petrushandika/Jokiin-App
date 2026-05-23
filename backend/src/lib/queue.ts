@@ -1,5 +1,5 @@
 import { Queue } from "bullmq";
-import { redis } from "./redis";
+import { redis } from "./redis.ts";
 
 const connection = { host: redis.options.host, port: redis.options.port };
 

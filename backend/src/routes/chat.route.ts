@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth } from "../middlewares/auth";
-import { rateLimit } from "../middlewares/rateLimit";
-import * as chatService from "../services/chat.service";
-import { ok, err } from "../lib/response";
+import { requireAuth } from "../middlewares/auth.ts";
+import { rateLimit } from "../middlewares/rateLimit.ts";
+import * as chatService from "../services/chat.service.ts";
+import { ok, err } from "../lib/response.ts";
 
 const chat = new Hono();
 
