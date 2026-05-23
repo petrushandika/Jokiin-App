@@ -1,0 +1,40 @@
+import { Hono } from "hono";
+import { rateLimit } from "../middlewares/rateLimit";
+import * as escrowService from "../services/escrow.service";
+import * as matchmakingService from "../services/matchmaking.service";
+import { ok, err } from "../lib/response";
+
+const webhooks = new Hono();
+
+// POST /webhooks/midtrans — Payment callback dari Midtrans
+webhooks.post(
+  "/midtrans",
+  rateLimit({ max: 200, windowSeconds: 60 }),
+  async (c) => {
+    const payload = await c.req.json();
+    try {
+      const result = await escrowService.handleMidtransWebhook(payload);
+
+      // Jika payment berhasil, mulai broadcast matchmaking
+      if (result.message === "Payment confirmed") {
+        const escrow = await import("../lib/database").then(({ db }) =>
+          db.query.escrowTransactions.findFirst({
+            where: (t, { eq }) => eq(t.idempotency_key, payload.order_id),
+          })
+        );
+        if (escrow) {
+          await matchmakingService.startBroadcast(escrow.order_id);
+        }
+      }
+
+      return c.json(ok(result));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+      if (msg === "INVALID_SIGNATURE") return c.json(err("INVALID_SIGNATURE", "Signature tidak valid"), 401);
+      if (msg === "ESCROW_NOT_FOUND") return c.json(err("ESCROW_NOT_FOUND", "Transaksi tidak ditemukan"), 404);
+      throw error;
+    }
+  }
+);
+
+export default webhooks;
