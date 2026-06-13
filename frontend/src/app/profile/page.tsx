@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Camera, Loader2, Plus, X } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,6 @@ export default function ProfilePage() {
   const toggleAvailability = useToggleAvailability();
   const updateProfile = useUpdateProfile();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -65,6 +64,12 @@ export default function ProfilePage() {
     },
   });
 
+  const bioValue = useWatch({ control: workerForm.control, name: "bio" });
+
+  // Track local category edits — null means "use server value"
+  const [categoryOverride, setCategoryOverride] = useState<string[] | null>(null);
+  const selectedCategories = categoryOverride ?? (workerProfile?.categories.map((c) => c.id) ?? []);
+
   useEffect(() => {
     if (workerProfile) {
       workerForm.reset({
@@ -73,7 +78,6 @@ export default function ProfilePage() {
         accountNumber: workerProfile.bankAccount?.accountNumber ?? "",
         accountName: workerProfile.bankAccount?.accountName ?? "",
       });
-      setSelectedCategories(workerProfile.categories.map((c) => c.id));
     }
   }, [workerProfile, workerForm]);
 
@@ -87,7 +91,7 @@ export default function ProfilePage() {
     try {
       await api.post("/profile/avatar", form);
       toast.success("Avatar berhasil diperbarui");
-    } catch (err) {
+    } catch {
       toast.error("Gagal mengupload avatar");
     }
   };
@@ -111,9 +115,10 @@ export default function ProfilePage() {
   });
 
   const toggleCategory = (id: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
+    setCategoryOverride((prev) => {
+      const current = prev ?? (workerProfile?.categories.map((c) => c.id) ?? []);
+      return current.includes(id) ? current.filter((c) => c !== id) : [...current, id];
+    });
   };
 
   return (
@@ -259,7 +264,7 @@ export default function ProfilePage() {
                           {...workerForm.register("bio")}
                         />
                         <p className="text-xs text-gray-400">
-                          {workerForm.watch("bio")?.length ?? 0}/500 karakter
+                          {bioValue?.length ?? 0}/500 karakter
                         </p>
                       </div>
 

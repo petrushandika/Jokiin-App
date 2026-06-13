@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { CheckCircle, Loader2, Upload, X, AlertCircle, ArrowRight, ArrowLeft } from "lucide-react";
@@ -61,6 +61,8 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
+const MIN_DEADLINE = new Date(Date.now() + 3600000).toISOString().slice(0, 16);
+
 export default function NewOrderPage() {
   const [step, setStep] = useState(0);
   const [files, setFiles] = useState<File[]>([]);
@@ -73,12 +75,14 @@ export default function NewOrderPage() {
     handleSubmit,
     getValues,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { difficulty: "medium" },
   });
+
+  const descriptionValue = useWatch({ control, name: "description" });
 
   const handleAnalyze = handleSubmit(async (data) => {
     const result = await analyzeOrder.mutateAsync(data);
@@ -137,7 +141,7 @@ export default function NewOrderPage() {
                 />
                 {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
                 <p className="text-xs text-gray-400">
-                  {watch("description")?.length ?? 0} / 50 karakter minimum
+                  {descriptionValue?.length ?? 0} / 50 karakter minimum
                 </p>
               </div>
 
@@ -180,7 +184,7 @@ export default function NewOrderPage() {
                 <Input
                   type="datetime-local"
                   {...register("deadline")}
-                  min={new Date(Date.now() + 3600000).toISOString().slice(0, 16)}
+                  min={MIN_DEADLINE}
                   className={errors.deadline ? "border-red-300" : ""}
                 />
                 {errors.deadline && <p className="text-xs text-red-500">{errors.deadline.message}</p>}

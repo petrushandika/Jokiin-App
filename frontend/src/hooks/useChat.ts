@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import { useAuthStore } from "@/store/auth";
 import type { Message } from "@/types";
 
 export function useMessages(orderId: string) {
@@ -17,7 +16,6 @@ export function useMessages(orderId: string) {
 }
 
 export function useChat(orderId: string) {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);

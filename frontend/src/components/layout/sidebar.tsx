@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Plus,
-  Wallet,
-  User,
-  ClipboardList,
-  Settings,
-} from "lucide-react";
+import { LayoutDashboard, Plus, Wallet, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 

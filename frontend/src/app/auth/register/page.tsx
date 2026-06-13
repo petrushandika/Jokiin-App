@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Zap, Loader2 } from "lucide-react";
@@ -38,14 +38,14 @@ function RegisterForm() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { role: defaultRole },
   });
 
-  const role = watch("role");
+  const role = useWatch({ control, name: "role" });
 
   return (
     <form onSubmit={handleSubmit((data) => register2.mutate(data))} className="space-y-4">

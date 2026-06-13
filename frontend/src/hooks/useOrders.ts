@@ -132,7 +132,7 @@ export function useAcceptBroadcast() {
   return useMutation({
     mutationFn: (broadcastId: string) =>
       api.post<Order>(`/broadcasts/${broadcastId}/accept`, {}),
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success("Berhasil menerima order!");
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["worker-dashboard"] });

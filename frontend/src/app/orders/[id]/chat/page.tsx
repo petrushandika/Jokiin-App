@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layout/navbar";
 import { useMessages, useChat } from "@/hooks/useChat";
 import { useOrder } from "@/hooks/useOrders";

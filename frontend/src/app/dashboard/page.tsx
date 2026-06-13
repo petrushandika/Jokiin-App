@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,8 +19,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useOrders } from "@/hooks/useOrders";
 import { getStatusColor, getStatusLabel, formatCurrency, formatDate } from "@/lib/status";
-import { DIFFICULTY_LABELS, ORDER_STATUSES } from "@/lib/constants";
-import type { OrderStatus } from "@/types";
+import { DIFFICULTY_LABELS } from "@/lib/constants";
 
 function OrderCardSkeleton() {
   return (

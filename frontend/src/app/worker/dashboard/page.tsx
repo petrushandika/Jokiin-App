@@ -2,19 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Timer, CheckCircle, X, Loader2, Zap, Power, AlertTriangle } from "lucide-react";
+import { Timer, CheckCircle, X, Loader2, Zap, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useWorkerDashboard, useToggleAvailability } from "@/hooks/useWorker";
 import { useAcceptBroadcast, useDeclineBroadcast } from "@/hooks/useOrders";
-import { getStatusColor, getStatusLabel, formatCurrency, formatDate, formatRelativeTime } from "@/lib/status";
-import { BADGE_COLORS, BROADCAST_TIMER_SECONDS } from "@/lib/constants";
+import { getStatusColor, getStatusLabel, formatCurrency, formatDate } from "@/lib/status";
+import { BROADCAST_TIMER_SECONDS } from "@/lib/constants";
 import type { OrderBroadcast } from "@/types";
 
 function BroadcastTimer({ expiresAt }: { expiresAt: string }) {
