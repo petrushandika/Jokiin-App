@@ -4,6 +4,8 @@ import { orders, workerProfiles, workerCategoryScores, broadcastLogs } from "../
 import { broadcastQueue } from "../lib/queue.ts";
 import { redis } from "../lib/redis.ts";
 import { createOrderChat } from "./chat.service.ts";
+import { notify } from "./notification.service.ts";
+import { emitToUser } from "../lib/socket.ts";
 
 // ─── Start Broadcast ──────────────────────────────────────────────────────────
 
@@ -117,6 +119,25 @@ export async function acceptOrder(orderId: string, workerUserId: string) {
 
     if (order) {
       await createOrderChat(orderId, order.customer_id, workerProfile.id);
+
+      // Transisi ke in_progress setelah chat dibuat
+      await db.update(orders).set({
+        status: "in_progress",
+        updated_at: new Date(),
+      }).where(eq(orders.id, orderId));
+
+      // Notifikasi customer bahwa worker ditemukan
+      const workerUser = await db.query.users.findFirst({
+        where: eq((await import("../../database/schema.ts")).users.id, workerProfile.user_id),
+        columns: { display_name: true },
+      });
+      await notify.orderAccepted(order.customer_id, orderId, workerUser?.display_name ?? "Worker");
+
+      // Emit real-time ke customer
+      emitToUser(order.customer_id, "order:matched", {
+        orderId,
+        workerName: workerUser?.display_name,
+      });
     }
 
     await broadcastQueue.add("order-taken", { orderId, workerUserId });

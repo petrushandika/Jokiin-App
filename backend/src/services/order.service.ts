@@ -4,6 +4,7 @@ import { orders, escrowTransactions, workerProfiles, reviews } from "../../datab
 import { reputationQueue, autoApproveQueue } from "../lib/queue.ts";
 import { analyzeTask } from "./ai.service.ts";
 import { categories } from "../../database/schema.ts";
+import { notify } from "./notification.service.ts";
 
 // ─── Analyze (AI) ─────────────────────────────────────────────────────────────
 
@@ -148,6 +149,15 @@ export async function approveOrder(orderId: string, customerId: string) {
 
   await reputationQueue.add("update-score", { orderId });
 
+  // Notifikasi worker bahwa order disetujui
+  const fullOrder = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: { worker: true },
+  });
+  if (fullOrder?.worker) {
+    await notify.orderApproved(fullOrder.worker.user_id, orderId, Number(fullOrder.worker_earnings ?? 0));
+  }
+
   return true;
 }
 
@@ -174,6 +184,14 @@ export async function requestRevision(
       updated_at: new Date(),
     })
     .where(eq(orders.id, orderId));
+
+  // Notifikasi worker
+  if (order.worker_id) {
+    const workerProfile = await db.query.workerProfiles.findFirst({
+      where: eq(workerProfiles.id, order.worker_id),
+    });
+    if (workerProfile) await notify.revisionRequested(workerProfile.user_id, orderId, note);
+  }
 
   return true;
 }
@@ -221,6 +239,13 @@ export async function submitOrder(input: {
     { orderId: input.orderId },
     { delay: 48 * 60 * 60 * 1000 }
   );
+
+  // Notifikasi customer bahwa hasil sudah dikirim
+  const orderData = await db.query.orders.findFirst({
+    where: eq(orders.id, input.orderId),
+    columns: { customer_id: true },
+  });
+  if (orderData) await notify.orderSubmitted(orderData.customer_id, input.orderId);
 
   return { autoApproveAt };
 }

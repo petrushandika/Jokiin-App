@@ -2,6 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
 import { wallets, walletTransactions, withdrawals } from "../../database/schema.ts";
 import { redis } from "../lib/redis.ts";
+import { notify } from "./notification.service.ts";
 
 // ─── Get Wallet ───────────────────────────────────────────────────────────────
 
@@ -85,6 +86,8 @@ export async function requestWithdraw(input: {
       idempotency_key: idempotencyKey,
     });
   });
+
+  await notify.withdrawalProcessed(input.userId, netAmount);
 
   return { netAmount, adminFee };
 }

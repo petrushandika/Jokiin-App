@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "../lib/database.ts";
 import { orders, escrowTransactions, wallets, walletTransactions } from "../../database/schema.ts";
 import * as crypto from "crypto";
+import { notify } from "./notification.service.ts";
 
 const MIDTRANS_BASE_URL = process.env.MIDTRANS_IS_PRODUCTION === "true"
   ? "https://app.midtrans.com/snap/v1"
@@ -152,6 +153,9 @@ export async function releaseEscrow(orderId: string) {
       description: `Pembayaran order #${orderId} (pending 48 jam)`,
     });
   });
+
+  // Notifikasi worker — dana pending
+  await notify.walletCredited(workerUserId, amount);
 
   return true;
 }

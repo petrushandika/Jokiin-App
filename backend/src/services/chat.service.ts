@@ -1,6 +1,8 @@
 import { eq, asc } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
-import { chats, messages, orders } from "../../database/schema.ts";
+import { chats, messages, orders, users } from "../../database/schema.ts";
+import { emitToOrder } from "../lib/socket.ts";
+import { notify } from "./notification.service.ts";
 
 // ─── Patterns yang diblokir ───────────────────────────────────────────────────
 
@@ -73,6 +75,17 @@ export async function sendMessage(input: {
       flag_reason: modResult.flagReason,
     })
     .returning();
+
+  // Emit real-time ke semua peserta order
+  emitToOrder(input.orderId, "chat:message", msg);
+
+  // Notifikasi ke pihak lain (bukan pengirim)
+  const recipientId = chat.customer_id === input.senderId ? chat.worker_id : chat.customer_id;
+  const sender = await dbRead.query.users.findFirst({
+    where: eq(users.id, input.senderId),
+    columns: { display_name: true },
+  });
+  await notify.newChatMessage(recipientId, input.orderId, sender?.display_name ?? "Pengguna");
 
   return { blocked: false, message: msg };
 }
