@@ -1,6 +1,6 @@
 import { eq, and, gt } from "drizzle-orm";
 import { db } from "../lib/database.ts";
-import { users, sessions, otpCodes, wallets } from "../../database/schema.ts";
+import { users, sessions, otpCodes, wallets, workerProfiles } from "../../database/schema.ts";
 import { redis } from "../lib/redis.ts";
 import * as argon2 from "argon2";
 import * as crypto from "crypto";
@@ -40,6 +40,11 @@ export async function registerUser(input: {
 
   // Buat wallet untuk setiap user
   await db.insert(wallets).values({ user_id: user!.id });
+
+  // Buat worker profile jika role worker
+  if (input.role === "worker") {
+    await db.insert(workerProfiles).values({ user_id: user!.id });
+  }
 
   await sendOtp(input.phone);
 

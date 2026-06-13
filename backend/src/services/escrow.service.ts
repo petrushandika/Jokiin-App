@@ -63,7 +63,8 @@ export async function handleMidtransWebhook(payload: {
   const validSignature = verifySignature(
     payload.order_id,
     payload.status_code,
-    payload.gross_amount
+    payload.gross_amount,
+    payload.signature_key
   );
   if (!validSignature) throw new Error("INVALID_SIGNATURE");
 
@@ -71,7 +72,8 @@ export async function handleMidtransWebhook(payload: {
     where: eq(escrowTransactions.idempotency_key, payload.order_id),
   });
   if (!existing) throw new Error("ESCROW_NOT_FOUND");
-  if (existing.status === "held") return { message: "Already processed" };
+  // Already processed if status moved past initial "held"
+  if (existing.status === "released" || existing.status === "refunded") return { message: "Already processed" };
 
   const isSuccess =
     payload.transaction_status === "capture" ||
@@ -167,13 +169,13 @@ function calculatePlatformFee(amount: number, badge: string): number {
   return Math.round(amount * (rates[badge] ?? 0.15));
 }
 
-function verifySignature(orderId: string, statusCode: string, grossAmount: string): boolean {
+function verifySignature(orderId: string, statusCode: string, grossAmount: string, signatureKey: string): boolean {
   const serverKey = process.env.MIDTRANS_SERVER_KEY!;
   const expected = crypto
     .createHash("sha512")
     .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
     .digest("hex");
-  return expected === process.env.MIDTRANS_WEBHOOK_SECRET;
+  return expected === signatureKey;
 }
 
 async function createMidtransTransaction(input: {

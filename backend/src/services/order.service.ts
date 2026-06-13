@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
-import { orders, escrowTransactions } from "../../database/schema.ts";
-import { reputationQueue } from "../lib/queue.ts";
+import { orders, escrowTransactions, workerProfiles, reviews } from "../../database/schema.ts";
+import { reputationQueue, autoApproveQueue } from "../lib/queue.ts";
 import { analyzeTask } from "./ai.service.ts";
 import { categories } from "../../database/schema.ts";
 
@@ -176,6 +176,119 @@ export async function requestRevision(
     .where(eq(orders.id, orderId));
 
   return true;
+}
+
+// ─── Submit Order (Worker) ────────────────────────────────────────────────────
+
+export async function submitOrder(input: {
+  orderId: string;
+  workerUserId: string;
+  fileUrls: string[];
+  notes?: string;
+}) {
+  const workerProfile = await db.query.workerProfiles.findFirst({
+    where: eq(workerProfiles.user_id, input.workerUserId),
+  });
+  if (!workerProfile) throw new Error("WORKER_NOT_FOUND");
+
+  const order = await db.query.orders.findFirst({
+    where: and(
+      eq(orders.id, input.orderId),
+      eq(orders.worker_id, workerProfile.id),
+    ),
+  });
+
+  if (!order) throw new Error("ORDER_NOT_FOUND");
+  if (order.status !== "in_progress" && order.status !== "revision") {
+    throw new Error("ORDER_NOT_SUBMITTABLE");
+  }
+
+  const autoApproveAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+  await db
+    .update(orders)
+    .set({
+      status: "submitted",
+      submitted_at: new Date(),
+      auto_approve_at: autoApproveAt,
+      attachment_urls: input.fileUrls,
+      updated_at: new Date(),
+    })
+    .where(eq(orders.id, input.orderId));
+
+  await autoApproveQueue.add(
+    "auto-approve",
+    { orderId: input.orderId },
+    { delay: 48 * 60 * 60 * 1000 }
+  );
+
+  return { autoApproveAt };
+}
+
+// ─── Get Worker Orders ────────────────────────────────────────────────────────
+
+export async function getWorkerOrders(workerUserId: string) {
+  const workerProfile = await db.query.workerProfiles.findFirst({
+    where: eq(workerProfiles.user_id, workerUserId),
+  });
+  if (!workerProfile) return [];
+
+  return dbRead.query.orders.findMany({
+    where: eq(orders.worker_id, workerProfile.id),
+    orderBy: [desc(orders.created_at)],
+    with: {
+      category: true,
+      customer: { columns: { display_name: true, avatar_url: true } },
+    },
+  });
+}
+
+// ─── Submit Review ────────────────────────────────────────────────────────────
+
+export async function submitReview(input: {
+  orderId: string;
+  customerId: string;
+  overallRating: number;
+  qualityRating?: number;
+  speedRating?: number;
+  communicationRating?: number;
+  comment?: string;
+  isAnonymous?: boolean;
+}) {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, input.orderId), eq(orders.customer_id, input.customerId)),
+  });
+
+  if (!order) throw new Error("ORDER_NOT_FOUND");
+  if (order.status !== "completed") throw new Error("ORDER_NOT_COMPLETED");
+  if (!order.worker_id) throw new Error("ORDER_NOT_FOUND");
+
+  const existing = await db.query.reviews.findFirst({
+    where: and(eq(reviews.order_id, input.orderId), eq(reviews.customer_id, input.customerId)),
+  });
+  if (existing) throw new Error("ALREADY_REVIEWED");
+
+  const now = new Date();
+  const revealAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // reveal setelah 7 hari
+
+  const [review] = await db.insert(reviews).values({
+    order_id: input.orderId,
+    customer_id: input.customerId,
+    worker_id: order.worker_id,
+    overall_rating: String(input.overallRating),
+    quality_rating: input.qualityRating ?? null,
+    comm_rating: input.communicationRating ?? null,
+    time_rating: input.speedRating ?? null,
+    customer_comment: input.comment,
+    customer_submitted: true,
+    reveal_at: revealAt,
+    customer_deadline: order.customer_deadline,
+    worker_deadline: order.worker_deadline ?? order.customer_deadline,
+  }).returning();
+
+  await reputationQueue.add("update-score", { orderId: input.orderId, workerId: order.worker_id });
+
+  return review!;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

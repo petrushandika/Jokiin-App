@@ -174,6 +174,13 @@ orders.post("/:id/reject", requireAuth, requireRole("worker"), async (c) => {
   return c.json(ok(null, { message: "Order ditolak" }));
 });
 
+// GET /orders/worker — Daftar order yang dikerjakan worker
+orders.get("/worker", requireAuth, requireRole("worker"), async (c) => {
+  const userId = c.get("userId");
+  const list = await orderService.getWorkerOrders(userId);
+  return c.json(ok(list));
+});
+
 // POST /orders/:id/submit — Worker submit hasil
 orders.post(
   "/:id/submit",
@@ -185,9 +192,52 @@ orders.post(
   })),
   async (c) => {
     const orderId = c.req.param("id");
+    const userId = c.get("userId");
     const { fileUrls, notes } = c.req.valid("json");
-    // TODO: implementasi submitOrder service
-    return c.json(ok(null, { message: "Hasil berhasil disubmit" }));
+    try {
+      const result = await orderService.submitOrder({
+        orderId,
+        workerUserId: userId,
+        fileUrls,
+        notes,
+      });
+      return c.json(ok(result, { message: "Hasil berhasil disubmit. Customer akan auto-approve dalam 48 jam jika tidak ada respon." }));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+      if (msg === "ORDER_NOT_FOUND") return c.json(err("ORDER_NOT_FOUND", "Order tidak ditemukan"), 404);
+      if (msg === "ORDER_NOT_SUBMITTABLE") return c.json(err("ORDER_NOT_SUBMITTABLE", "Status order tidak bisa disubmit"), 400);
+      throw error;
+    }
+  }
+);
+
+// POST /orders/:id/rate — Customer submit review setelah completed
+orders.post(
+  "/:id/rate",
+  requireAuth,
+  requireRole("customer"),
+  zValidator("json", z.object({
+    overallRating: z.number().min(1).max(5),
+    qualityRating: z.number().min(1).max(5).optional(),
+    speedRating: z.number().min(1).max(5).optional(),
+    communicationRating: z.number().min(1).max(5).optional(),
+    comment: z.string().max(1000).optional(),
+    isAnonymous: z.boolean().optional(),
+  })),
+  async (c) => {
+    const orderId = c.req.param("id");
+    const userId = c.get("userId");
+    const body = c.req.valid("json");
+    try {
+      const result = await orderService.submitReview({ orderId, customerId: userId, ...body });
+      return c.json(ok(result, { message: "Review berhasil dikirim" }), 201);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+      if (msg === "ORDER_NOT_FOUND") return c.json(err("ORDER_NOT_FOUND", "Order tidak ditemukan"), 404);
+      if (msg === "ORDER_NOT_COMPLETED") return c.json(err("ORDER_NOT_COMPLETED", "Order belum selesai"), 400);
+      if (msg === "ALREADY_REVIEWED") return c.json(err("ALREADY_REVIEWED", "Review sudah dikirim"), 409);
+      throw error;
+    }
   }
 );
 

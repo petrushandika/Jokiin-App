@@ -7,8 +7,16 @@ import ordersRoute from "./routes/orders.route.ts";
 import chatRoute from "./routes/chat.route.ts";
 import walletsRoute from "./routes/wallets.route.ts";
 import webhooksRoute from "./routes/webhooks.route.ts";
+import categoriesRoute from "./routes/categories.route.ts";
+import profileRoute from "./routes/profile.route.ts";
 import { errorHandler } from "./middlewares/errorHandler.ts";
 import type { AppVariables } from "./lib/context.ts";
+
+// ─── BullMQ Workers ───────────────────────────────────────────────────────────
+import "./workers/broadcast.worker.ts";
+import "./workers/auto-approve.worker.ts";
+import "./workers/reputation.worker.ts";
+import "./workers/deadline.worker.ts";
 
 const app = new Hono<{ Variables: AppVariables }>();
 
@@ -28,6 +36,8 @@ app.route("/api/orders", ordersRoute);
 app.route("/api/chats", chatRoute);
 app.route("/api/wallets", walletsRoute);
 app.route("/api/webhooks", webhooksRoute);
+app.route("/api/categories", categoriesRoute);
+app.route("/api/profile", profileRoute);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));

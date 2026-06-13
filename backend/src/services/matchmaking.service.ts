@@ -3,6 +3,7 @@ import { db, dbRead } from "../lib/database.ts";
 import { orders, workerProfiles, workerCategoryScores, broadcastLogs } from "../../database/schema.ts";
 import { broadcastQueue } from "../lib/queue.ts";
 import { redis } from "../lib/redis.ts";
+import { createOrderChat } from "./chat.service.ts";
 
 // ─── Start Broadcast ──────────────────────────────────────────────────────────
 
@@ -64,17 +65,24 @@ export async function getEligibleWorkers(orderId: string) {
 
 // ─── Accept Order ─────────────────────────────────────────────────────────────
 
-export async function acceptOrder(orderId: string, workerId: string) {
+export async function acceptOrder(orderId: string, workerUserId: string) {
   const lockKey = `order_lock:${orderId}`;
-  const locked = await redis.setnx(lockKey, workerId);
+  const locked = await redis.setnx(lockKey, workerUserId);
 
   if (!locked) throw new Error("ORDER_ALREADY_TAKEN");
 
   await redis.expire(lockKey, 300);
 
   try {
+    const workerProfile = await db.query.workerProfiles.findFirst({
+      where: eq(workerProfiles.user_id, workerUserId),
+    });
+    if (!workerProfile) throw new Error("ORDER_NOT_AVAILABLE");
+
+    let order: typeof orders.$inferSelect | undefined;
+
     await db.transaction(async (tx) => {
-      const order = await tx.query.orders.findFirst({
+      order = await tx.query.orders.findFirst({
         where: and(eq(orders.id, orderId), eq(orders.status, "broadcast")),
       });
 
@@ -82,12 +90,12 @@ export async function acceptOrder(orderId: string, workerId: string) {
 
       const platformFee = calculatePlatformFeeByBadge(
         Number(order.agreed_price),
-        "SPROUT"
+        workerProfile.badge
       );
 
       await tx.update(orders).set({
         status: "matched",
-        worker_id: workerId,
+        worker_id: workerProfile.id,
         started_at: new Date(),
         platform_fee: String(platformFee),
         worker_earnings: String(Number(order.agreed_price) - platformFee),
@@ -96,10 +104,22 @@ export async function acceptOrder(orderId: string, workerId: string) {
 
       await tx.update(workerProfiles).set({
         current_active_orders: sql`${workerProfiles.current_active_orders} + 1`,
-      }).where(eq(workerProfiles.id, workerId));
+      }).where(eq(workerProfiles.id, workerProfile.id));
+
+      await tx.insert(broadcastLogs).values({
+        order_id: orderId,
+        worker_id: workerProfile.id,
+        batch_number: 1,
+        response: "accepted",
+        responded_at: new Date(),
+      });
     });
 
-    await broadcastQueue.add("order-taken", { orderId, workerId });
+    if (order) {
+      await createOrderChat(orderId, order.customer_id, workerProfile.id);
+    }
+
+    await broadcastQueue.add("order-taken", { orderId, workerUserId });
     return true;
   } catch (error) {
     await redis.del(lockKey);
