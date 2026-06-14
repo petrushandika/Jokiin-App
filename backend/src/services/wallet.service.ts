@@ -43,19 +43,27 @@ export async function requestWithdraw(input: {
   if (!storedOtp || storedOtp !== input.otpCode) throw new Error("INVALID_OTP");
   await redis.del(otpKey);
 
-  const wallet = await db.query.wallets.findFirst({
+  // Pre-check outside transaction (fast fail)
+  const walletCheck = await db.query.wallets.findFirst({
     where: eq(wallets.user_id, input.userId),
   });
 
-  if (!wallet) throw new Error("WALLET_NOT_FOUND");
-  if (!wallet.is_bank_verified) throw new Error("BANK_NOT_VERIFIED");
-  if (Number(wallet.balance) < input.amount) throw new Error("INSUFFICIENT_BALANCE");
+  if (!walletCheck) throw new Error("WALLET_NOT_FOUND");
+  if (!walletCheck.is_bank_verified) throw new Error("BANK_NOT_VERIFIED");
 
   const adminFee = calculateAdminFee(input.amount);
   const netAmount = input.amount - adminFee;
   const idempotencyKey = `wd-${input.userId}-${Date.now()}`;
 
   await db.transaction(async (tx) => {
+    // Re-fetch inside transaction for atomic balance check (prevents race condition)
+    const wallet = await tx.query.wallets.findFirst({
+      where: eq(wallets.user_id, input.userId),
+    });
+
+    if (!wallet) throw new Error("WALLET_NOT_FOUND");
+    if (Number(wallet.balance) < input.amount) throw new Error("INSUFFICIENT_BALANCE");
+
     const balanceBefore = Number(wallet.balance);
     const balanceAfter = balanceBefore - input.amount;
 

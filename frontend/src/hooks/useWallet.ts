@@ -8,7 +8,7 @@ import type { PaginatedData, Wallet, WalletTransaction, WithdrawPayload } from "
 export function useWallet() {
   return useQuery({
     queryKey: ["wallet"],
-    queryFn: () => api.get<Wallet>("/wallet"),
+    queryFn: () => api.get<Wallet>("/wallets"),
   });
 }
 
@@ -17,7 +17,7 @@ export function useTransactions(page = 1) {
     queryKey: ["transactions", page],
     queryFn: () =>
       api.get<PaginatedData<WalletTransaction>>(
-        `/wallet/transactions?page=${page}&limit=20`
+        `/wallets/transactions?page=${page}&limit=20`
       ),
   });
 }
@@ -25,7 +25,7 @@ export function useTransactions(page = 1) {
 export function useRequestWithdrawOtp() {
   return useMutation({
     mutationFn: () =>
-      api.post<{ message: string }>("/wallet/withdraw/request-otp", {}),
+      api.post<{ message: string }>("/wallets/withdraw/otp", {}),
     onSuccess: () => {
       toast.success("OTP dikirim ke WhatsApp kamu.");
     },
@@ -40,7 +40,7 @@ export function useWithdraw() {
 
   return useMutation({
     mutationFn: (payload: WithdrawPayload) =>
-      api.post<{ message: string }>("/wallet/withdraw", payload),
+      api.post<{ message: string }>("/wallets/withdraw", payload),
     onSuccess: () => {
       toast.success("Permintaan penarikan berhasil dikirim!");
       queryClient.invalidateQueries({ queryKey: ["wallet"] });

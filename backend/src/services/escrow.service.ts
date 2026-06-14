@@ -19,8 +19,29 @@ export async function initiatePayment(orderId: string, customerId: string) {
   if (!order) throw new Error("ORDER_NOT_FOUND");
   if (order.status !== "pending_payment") throw new Error("ORDER_NOT_PAYABLE");
 
-  const idempotencyKey = `pay-${orderId}-${Date.now()}`;
+  // Idempotency: return existing escrow + snap token if already created
+  const existingEscrow = await db.query.escrowTransactions.findFirst({
+    where: eq(escrowTransactions.order_id, orderId),
+  });
+  if (existingEscrow && existingEscrow.status === "held" && !existingEscrow.paid_at) {
+    const snapToken = await createMidtransTransaction({
+      orderId: existingEscrow.midtrans_order_id!,
+      amount: Number(existingEscrow.total_amount),
+      customer: {
+        name: order.customer.display_name,
+        email: order.customer.email,
+        phone: order.customer.phone ?? "",
+      },
+      itemName: order.title,
+    });
+    return { snapToken, escrowId: existingEscrow.id };
+  }
+
+  // Use a stable idempotency key tied to orderId only (no timestamp)
+  const idempotencyKey = `pay-${orderId}`;
   const amount = Number(order.agreed_price);
+  // Use SPROUT fee at initiation; actual fee is recalculated when worker accepts
+  const platformFee = calculatePlatformFee(amount, "SPROUT");
 
   const [escrow] = await db
     .insert(escrowTransactions)
@@ -28,8 +49,8 @@ export async function initiatePayment(orderId: string, customerId: string) {
       order_id: orderId,
       status: "held",
       total_amount: String(amount),
-      platform_fee: String(calculatePlatformFee(amount, "SPROUT")),
-      worker_amount: String(amount - calculatePlatformFee(amount, "SPROUT")),
+      platform_fee: String(platformFee),
+      worker_amount: String(amount - platformFee),
       refund_amount: "0",
       midtrans_order_id: idempotencyKey,
       idempotency_key: idempotencyKey,
@@ -73,7 +94,8 @@ export async function handleMidtransWebhook(payload: {
     where: eq(escrowTransactions.idempotency_key, payload.order_id),
   });
   if (!existing) throw new Error("ESCROW_NOT_FOUND");
-  // Already processed if status moved past initial "held"
+  // Idempotency: skip if already paid (webhook already processed)
+  if (existing.paid_at !== null) return { message: "Already processed" };
   if (existing.status === "released" || existing.status === "refunded") return { message: "Already processed" };
 
   const isSuccess =
@@ -88,6 +110,7 @@ export async function handleMidtransWebhook(payload: {
       .set({
         status: "held",
         payment_method: payload.payment_type,
+        paid_at: new Date(),
         webhook_payload: payload as Record<string, unknown>,
       })
       .where(eq(escrowTransactions.idempotency_key, payload.order_id));

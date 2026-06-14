@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
 import { db } from "./database.ts";
-import { sessions } from "../../database/schema.ts";
+import { sessions, workerProfiles } from "../../database/schema.ts";
 import { eq } from "drizzle-orm";
 import type { Socket } from "socket.io";
 
@@ -64,23 +64,17 @@ export function createSocketServer(): SocketIOServer {
     // Worker online status
     socket.on("worker:online", async () => {
       if (socket.data.userRole !== "worker") return;
-      await db.query.workerProfiles.findFirst; // lazy import
-      const { workerProfiles } = await import("../../database/schema.ts");
-      const { db: database } = await import("./database.ts");
-      await database.update(workerProfiles)
+      await db.update(workerProfiles)
         .set({ is_online: true })
-        .where((await import("drizzle-orm")).eq(workerProfiles.user_id, userId));
+        .where(eq(workerProfiles.user_id, userId));
       socket.to("admin:room").emit("worker:status", { userId, online: true });
     });
 
     socket.on("disconnect", async () => {
       if (socket.data.userRole === "worker") {
-        const { workerProfiles } = await import("../../database/schema.ts");
-        const { db: database } = await import("./database.ts");
-        const { eq: eqFn } = await import("drizzle-orm");
-        await database.update(workerProfiles)
+        await db.update(workerProfiles)
           .set({ is_online: false })
-          .where(eqFn(workerProfiles.user_id, userId));
+          .where(eq(workerProfiles.user_id, userId));
       }
       console.log(`[Socket] User ${userId} disconnected`);
     });

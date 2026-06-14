@@ -52,7 +52,7 @@ export function useVerifyOtp() {
 
   return useMutation({
     mutationFn: (payload: OtpPayload) =>
-      api.post<AuthResponse>("/auth/verify-otp", payload),
+      api.post<AuthResponse>("/auth/otp/verify", payload),
     onSuccess: (data) => {
       setUser(data.user);
       setToken(data.token);
@@ -72,7 +72,7 @@ export function useVerifyOtp() {
 export function useResendOtp() {
   return useMutation({
     mutationFn: (phone: string) =>
-      api.post<{ message: string }>("/auth/resend-otp", { phone }),
+      api.post<{ message: string }>("/auth/otp/resend", { phone }),
     onSuccess: () => {
       toast.success("OTP baru telah dikirim ke WhatsApp kamu.");
     },

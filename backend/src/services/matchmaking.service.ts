@@ -1,6 +1,6 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
-import { orders, workerProfiles, workerCategoryScores, broadcastLogs } from "../../database/schema.ts";
+import { orders, workerProfiles, workerCategoryScores, broadcastLogs, users } from "../../database/schema.ts";
 import { broadcastQueue } from "../lib/queue.ts";
 import { redis } from "../lib/redis.ts";
 import { createOrderChat } from "./chat.service.ts";
@@ -128,7 +128,7 @@ export async function acceptOrder(orderId: string, workerUserId: string) {
 
       // Notifikasi customer bahwa worker ditemukan
       const workerUser = await db.query.users.findFirst({
-        where: eq((await import("../../database/schema.ts")).users.id, workerProfile.user_id),
+        where: eq(users.id, workerProfile.user_id),
         columns: { display_name: true },
       });
       await notify.orderAccepted(order.customer_id, orderId, workerUser?.display_name ?? "Worker");

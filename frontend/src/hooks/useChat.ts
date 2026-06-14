@@ -24,7 +24,7 @@ export function useChat(orderId: string) {
   useEffect(() => {
     const socket = socketRef.current;
 
-    socket.emit("join_order", { orderId });
+    socket.emit("join:order", orderId);
 
     socket.on("connect", () => setIsConnected(true));
     socket.on("disconnect", () => setIsConnected(false));
@@ -47,7 +47,7 @@ export function useChat(orderId: string) {
     setIsConnected(socket.connected);
 
     return () => {
-      socket.emit("leave_order", { orderId });
+      socket.emit("leave:order", orderId);
       socket.off("new_message");
       socket.off("message_moderated");
       socket.off("connect");

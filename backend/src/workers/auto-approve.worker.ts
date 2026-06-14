@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { redis } from "../lib/redis.ts";
 import { db } from "../lib/database.ts";
-import { orders, escrowTransactions } from "../../database/schema.ts";
+import { orders } from "../../database/schema.ts";
 import { eq, and } from "drizzle-orm";
 import { reputationQueue } from "../lib/queue.ts";
 import { releaseEscrow } from "../services/escrow.service.ts";
@@ -19,18 +19,14 @@ export const autoApproveWorker = new Worker(
 
     if (!order) return { skipped: true, reason: "order_not_submitted" };
 
-    await db.transaction(async (tx) => {
-      await tx.update(orders).set({
-        status: "completed",
-        completed_at: new Date(),
-        updated_at: new Date(),
-      }).where(eq(orders.id, orderId));
+    // Update order status to completed first
+    await db.update(orders).set({
+      status: "completed",
+      completed_at: new Date(),
+      updated_at: new Date(),
+    }).where(eq(orders.id, orderId));
 
-      await tx.update(escrowTransactions).set({
-        status: "released",
-      }).where(eq(escrowTransactions.order_id, orderId));
-    });
-
+    // releaseEscrow handles both the escrow status update and wallet credit atomically
     await releaseEscrow(orderId);
     await reputationQueue.add("update-score", { orderId });
 

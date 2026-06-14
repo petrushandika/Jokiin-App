@@ -44,16 +44,10 @@ export function useCreateOrder() {
 
   return useMutation({
     mutationFn: (payload: CreateOrderPayload) => {
-      const form = new FormData();
-      form.append("title", payload.title);
-      form.append("description", payload.description);
-      form.append("categoryId", payload.categoryId);
-      form.append("difficulty", payload.difficulty);
-      form.append("deadline", payload.deadline);
-      if (payload.files) {
-        payload.files.forEach((f) => form.append("files", f));
-      }
-      return api.post<Order>("/orders", form);
+      // Backend expects JSON body (zValidator "json")
+      // Files should be uploaded separately via /upload first to get URLs
+      const { files: _files, ...jsonPayload } = payload;
+      return api.post<Order>("/orders", jsonPayload);
     },
     onSuccess: (data) => {
       toast.success("Order berhasil dibuat!");
@@ -93,7 +87,7 @@ export function useRequestRevision() {
     }: {
       orderId: string;
       reason: string;
-    }) => api.post<Order>(`/orders/${orderId}/revision`, { reason }),
+    }) => api.post<Order>(`/orders/${orderId}/revision`, { note: reason }),
     onSuccess: (_, { orderId }) => {
       toast.success("Permintaan revisi dikirim.");
       queryClient.invalidateQueries({ queryKey: ["orders", orderId] });
@@ -109,11 +103,13 @@ export function useSubmitOrder() {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: (payload: SubmitOrderPayload) => {
-      const form = new FormData();
-      form.append("notes", payload.notes);
-      payload.files.forEach((f) => form.append("files", f));
-      return api.post<Order>(`/orders/${payload.orderId}/submit`, form);
+    mutationFn: (payload: SubmitOrderPayload & { fileUrls?: string[] }) => {
+      // Files must be pre-uploaded via /upload to get URLs before submitting.
+      // fileUrls takes priority; fall back to an empty array if not provided yet.
+      return api.post<Order>(`/orders/${payload.orderId}/submit`, {
+        fileUrls: payload.fileUrls ?? [],
+        notes: payload.notes,
+      });
     },
     onSuccess: (data) => {
       toast.success("Hasil tugas berhasil dikirim!");
@@ -130,8 +126,8 @@ export function useAcceptBroadcast() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (broadcastId: string) =>
-      api.post<Order>(`/broadcasts/${broadcastId}/accept`, {}),
+    mutationFn: (orderId: string) =>
+      api.post<Order>(`/orders/${orderId}/accept`, {}),
     onSuccess: () => {
       toast.success("Berhasil menerima order!");
       queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -145,8 +141,8 @@ export function useAcceptBroadcast() {
 
 export function useDeclineBroadcast() {
   return useMutation({
-    mutationFn: (broadcastId: string) =>
-      api.post<{ message: string }>(`/broadcasts/${broadcastId}/decline`, {}),
+    mutationFn: (orderId: string) =>
+      api.post<{ message: string }>(`/orders/${orderId}/reject`, {}),
     onError: (err: Error) => {
       toast.error(err.message ?? "Gagal menolak order.");
     },

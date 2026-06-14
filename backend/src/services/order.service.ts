@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
-import { orders, escrowTransactions, workerProfiles, reviews } from "../../database/schema.ts";
+import { orders, workerProfiles, reviews } from "../../database/schema.ts";
 import { reputationQueue, autoApproveQueue } from "../lib/queue.ts";
 import { analyzeTask } from "./ai.service.ts";
 import { categories } from "../../database/schema.ts";
@@ -135,17 +135,11 @@ export async function approveOrder(orderId: string, customerId: string) {
     throw new Error("ORDER_NOT_SUBMITTED");
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(orders)
-      .set({ status: "completed", completed_at: new Date() })
-      .where(eq(orders.id, orderId));
-
-    await tx
-      .update(escrowTransactions)
-      .set({ status: "released" })
-      .where(eq(escrowTransactions.order_id, orderId));
-  });
+  // Only update order status here — escrow release is handled by releaseEscrow() in the route handler
+  await db
+    .update(orders)
+    .set({ status: "completed", completed_at: new Date(), updated_at: new Date() })
+    .where(eq(orders.id, orderId));
 
   await reputationQueue.add("update-score", { orderId });
 

@@ -1,4 +1,4 @@
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, isNull, ne } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
 import { chats, messages, orders, users } from "../../database/schema.ts";
 import { emitToOrder } from "../lib/socket.ts";
@@ -112,10 +112,17 @@ export async function markMessagesRead(chatId: string, userId: string) {
   if (!chat) return;
   if (chat.customer_id !== userId && chat.worker_id !== userId) return;
 
+  // Only mark messages from the OTHER party as read (not the reader's own messages)
   await db
     .update(messages)
     .set({ read_at: new Date() })
-    .where(eq(messages.chat_id, chatId));
+    .where(
+      and(
+        eq(messages.chat_id, chatId),
+        ne(messages.sender_id, userId),
+        isNull(messages.read_at)
+      )
+    );
 }
 
 // ─── Moderasi ─────────────────────────────────────────────────────────────────
