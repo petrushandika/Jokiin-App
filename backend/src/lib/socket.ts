@@ -71,10 +71,14 @@ export function createSocketServer(): SocketIOServer {
     });
 
     socket.on("disconnect", async () => {
-      if (socket.data.userRole === "worker") {
-        await db.update(workerProfiles)
-          .set({ is_online: false })
-          .where(eq(workerProfiles.user_id, userId));
+      if (socket.data.userRole === "worker" && io) {
+        const activeSockets = await io.in(`user:${userId}`).fetchSockets();
+        if (activeSockets.length === 0) {
+          await db.update(workerProfiles)
+            .set({ is_online: false })
+            .where(eq(workerProfiles.user_id, userId));
+          io.to("admin:room").emit("worker:status", { userId, online: false });
+        }
       }
       console.log(`[Socket] User ${userId} disconnected`);
     });

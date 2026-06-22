@@ -26,29 +26,35 @@ export async function registerUser(input: {
 
   const passwordHash = await argon2.hash(input.password);
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      email: input.email,
-      phone: input.phone,
-      password_hash: passwordHash,
-      display_name: input.displayName,
-      role: input.role,
-      is_verified: false,
-    })
-    .returning();
+  const userId = await db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(users)
+      .values({
+        email: input.email,
+        phone: input.phone,
+        password_hash: passwordHash,
+        display_name: input.displayName,
+        role: input.role,
+        is_verified: false,
+      })
+      .returning();
 
-  // Buat wallet untuk setiap user
-  await db.insert(wallets).values({ user_id: user!.id });
+    if (!user) throw new Error("REGISTRATION_FAILED");
 
-  // Buat worker profile jika role worker
-  if (input.role === "worker") {
-    await db.insert(workerProfiles).values({ user_id: user!.id });
-  }
+    // Buat wallet untuk setiap user
+    await tx.insert(wallets).values({ user_id: user.id });
+
+    // Buat worker profile jika role worker
+    if (input.role === "worker") {
+      await tx.insert(workerProfiles).values({ user_id: user.id });
+    }
+
+    return user.id;
+  });
 
   await sendOtp(input.phone);
 
-  return { userId: user!.id };
+  return { userId };
 }
 
 // ─── OTP ─────────────────────────────────────────────────────────────────────

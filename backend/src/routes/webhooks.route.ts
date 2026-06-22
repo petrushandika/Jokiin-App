@@ -16,15 +16,8 @@ webhooks.post(
       const result = await escrowService.handleMidtransWebhook(payload);
 
       // Jika payment berhasil, mulai broadcast matchmaking
-      if (result.message === "Payment confirmed") {
-        const escrow = await import("../lib/database.ts").then(({ db }) =>
-          db.query.escrowTransactions.findFirst({
-            where: (t, { eq }) => eq(t.idempotency_key, payload.order_id),
-          })
-        );
-        if (escrow) {
-          await matchmakingService.startBroadcast(escrow.order_id);
-        }
+      if (result.message === "Payment confirmed" && result.orderId) {
+        await matchmakingService.startBroadcast(result.orderId);
       }
 
       return c.json(ok(result));

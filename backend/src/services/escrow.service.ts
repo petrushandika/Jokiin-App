@@ -95,14 +95,14 @@ export async function handleMidtransWebhook(payload: {
   });
   if (!existing) throw new Error("ESCROW_NOT_FOUND");
   // Idempotency: skip if already paid (webhook already processed)
-  if (existing.paid_at !== null) return { message: "Already processed" };
-  if (existing.status === "released" || existing.status === "refunded") return { message: "Already processed" };
+  if (existing.paid_at !== null) return { message: "Already processed", orderId: existing.order_id };
+  if (existing.status === "released" || existing.status === "refunded") return { message: "Already processed", orderId: existing.order_id };
 
   const isSuccess =
     payload.transaction_status === "capture" ||
     payload.transaction_status === "settlement";
 
-  if (!isSuccess) return { message: "Payment not successful" };
+  if (!isSuccess) return { message: "Payment not successful", orderId: existing.order_id };
 
   await db.transaction(async (tx) => {
     await tx
@@ -121,13 +121,18 @@ export async function handleMidtransWebhook(payload: {
       .where(eq(orders.id, existing.order_id));
   });
 
-  return { message: "Payment confirmed" };
+  return { message: "Payment confirmed", orderId: existing.order_id };
 }
 
 // ─── Release Escrow ───────────────────────────────────────────────────────────
 
-export async function releaseEscrow(orderId: string) {
-  const escrow = await db.query.escrowTransactions.findFirst({
+export async function releaseEscrow(
+  orderId: string,
+  txClient?: Parameters<Parameters<typeof db.transaction>[0]>[0]
+) {
+  const client = txClient ?? db;
+
+  const escrow = await client.query.escrowTransactions.findFirst({
     where: and(
       eq(escrowTransactions.order_id, orderId),
       eq(escrowTransactions.status, "held")
@@ -136,7 +141,7 @@ export async function releaseEscrow(orderId: string) {
 
   if (!escrow) throw new Error("ESCROW_NOT_FOUND");
 
-  const order = await db.query.orders.findFirst({
+  const order = await client.query.orders.findFirst({
     where: eq(orders.id, orderId),
     with: { worker: true },
   });
@@ -146,7 +151,7 @@ export async function releaseEscrow(orderId: string) {
   const workerUserId = order.worker.user_id;
   const amount = Number(escrow.worker_amount);
 
-  await db.transaction(async (tx) => {
+  const executeUpdates = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
     await tx
       .update(escrowTransactions)
       .set({ status: "released" })
@@ -175,7 +180,15 @@ export async function releaseEscrow(orderId: string) {
       balance_after: String(pendingAfter),
       description: `Pembayaran order #${orderId} (pending 48 jam)`,
     });
-  });
+  };
+
+  if (txClient) {
+    await executeUpdates(txClient);
+  } else {
+    await db.transaction(async (tx) => {
+      await executeUpdates(tx);
+    });
+  }
 
   // Notifikasi worker — dana pending
   await notify.walletCredited(workerUserId, amount);

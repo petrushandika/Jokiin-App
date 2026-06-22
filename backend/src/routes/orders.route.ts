@@ -7,6 +7,7 @@ import * as orderService from "../services/order.service.ts";
 import * as escrowService from "../services/escrow.service.ts";
 import * as matchmakingService from "../services/matchmaking.service.ts";
 import { ok, err } from "../lib/response.ts";
+import { db } from "../lib/database.ts";
 
 const orders = new Hono();
 
@@ -117,8 +118,10 @@ orders.post("/:id/approve", requireAuth, requireRole("customer"), async (c) => {
   const orderId = c.req.param("id");
   const userId = c.get("userId");
   try {
-    await orderService.approveOrder(orderId, userId);
-    await escrowService.releaseEscrow(orderId);
+    await db.transaction(async (tx) => {
+      await orderService.approveOrder(orderId, userId, tx);
+      await escrowService.releaseEscrow(orderId, tx);
+    });
     return c.json(ok(null, { message: "Order disetujui, dana dikirim ke worker" }));
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "UNKNOWN_ERROR";

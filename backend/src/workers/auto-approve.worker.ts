@@ -19,15 +19,16 @@ export const autoApproveWorker = new Worker(
 
     if (!order) return { skipped: true, reason: "order_not_submitted" };
 
-    // Update order status to completed first
-    await db.update(orders).set({
-      status: "completed",
-      completed_at: new Date(),
-      updated_at: new Date(),
-    }).where(eq(orders.id, orderId));
+    // Update order status to completed and release escrow atomically
+    await db.transaction(async (tx) => {
+      await tx.update(orders).set({
+        status: "completed",
+        completed_at: new Date(),
+        updated_at: new Date(),
+      }).where(eq(orders.id, orderId));
 
-    // releaseEscrow handles both the escrow status update and wallet credit atomically
-    await releaseEscrow(orderId);
+      await releaseEscrow(orderId, tx);
+    });
     await reputationQueue.add("update-score", { orderId });
 
     console.log(`[AutoApprove] Order ${orderId} auto-approved after 48h timeout`);

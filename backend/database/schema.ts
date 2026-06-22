@@ -1092,4 +1092,6 @@ export const otpCodes = pgTable("otp_codes", {
   expiresAt : timestamp("expires_at").notNull(),
   isUsed    : boolean("is_used").notNull().default(false),
   createdAt : timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  phone_code_idx: index("otp_codes_phone_code_idx").on(t.phone, t.code),
+}));

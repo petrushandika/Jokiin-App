@@ -82,11 +82,19 @@ PESAN BARU: ${message}
 Jawab true jika ada permintaan baru di luar scope awal.
 `.trim();
 
-  const { object } = await generateObject({
-    model: groq("llama-3.3-70b-versatile"),
-    schema: ScopeGuardSchema,
-    prompt,
-  });
-
-  return object;
+  try {
+    const { object } = await generateObject({
+      model: groq("llama-3.3-70b-versatile"),
+      schema: ScopeGuardSchema,
+      prompt,
+    });
+    return object;
+  } catch {
+    const { object } = await generateObject({
+      model: mistral("mistral-small-latest"),
+      schema: ScopeGuardSchema,
+      prompt,
+    });
+    return object;
+  }
 }

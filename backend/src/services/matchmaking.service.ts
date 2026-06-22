@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { db, dbRead } from "../lib/database.ts";
 import { orders, workerProfiles, workerCategoryScores, broadcastLogs, users } from "../../database/schema.ts";
 import { broadcastQueue } from "../lib/queue.ts";
@@ -6,81 +6,99 @@ import { redis } from "../lib/redis.ts";
 import { createOrderChat } from "./chat.service.ts";
 import { notify } from "./notification.service.ts";
 import { emitToUser } from "../lib/socket.ts";
-
+ 
 // ─── Start Broadcast ──────────────────────────────────────────────────────────
-
+ 
 export async function startBroadcast(orderId: string) {
   await broadcastQueue.add("broadcast", { orderId, batch: 1 }, {
     attempts: 3,
     backoff: { type: "exponential", delay: 2000 },
   });
 }
-
+ 
 // ─── Get Eligible Workers ─────────────────────────────────────────────────────
-
+ 
 export async function getEligibleWorkers(orderId: string) {
   const order = await db.query.orders.findFirst({
     where: eq(orders.id, orderId),
   });
   if (!order) throw new Error("ORDER_NOT_FOUND");
-
+ 
   const minBadge = getMinBadgeForDifficulty(order.difficulty_score as string);
   const badgeValues = getBadgesAbove(minBadge);
-
-  const eligible = await dbRead.query.workerProfiles.findMany({
-    where: and(
-      eq(workerProfiles.is_online, true),
-      eq(workerProfiles.is_on_leave, false),
-      sql`${workerProfiles.current_active_orders} < ${workerProfiles.max_active_orders}`,
-    ),
-    with: {
-      categoryScores: {
-        where: eq(workerCategoryScores.category_id, order.category_id),
-      },
-      user: { columns: { is_banned: true, is_suspended: true } },
-    },
-  });
-
+ 
+  const eligible = await dbRead
+    .select({
+      id: workerProfiles.id,
+      user_id: workerProfiles.user_id,
+      badge: workerProfiles.badge,
+      reputation_score: workerProfiles.reputation_score,
+      is_pro: workerProfiles.is_pro,
+      categoryRating: workerCategoryScores.rating,
+    })
+    .from(workerProfiles)
+    .innerJoin(users, eq(workerProfiles.user_id, users.id))
+    .innerJoin(
+      workerCategoryScores,
+      and(
+        eq(workerCategoryScores.worker_id, workerProfiles.id),
+        eq(workerCategoryScores.category_id, order.category_id)
+      )
+    )
+    .where(
+      and(
+        eq(workerProfiles.is_online, true),
+        eq(workerProfiles.is_on_leave, false),
+        sql`${workerProfiles.current_active_orders} < ${workerProfiles.max_active_orders}`,
+        eq(users.is_banned, false),
+        eq(users.is_suspended, false),
+        inArray(workerProfiles.badge, badgeValues as any)
+      )
+    );
+ 
   const now = new Date();
-
-  const filtered = eligible.filter((w) => {
-    if (w.user.is_banned || w.user.is_suspended) return false;
-    if (!badgeValues.includes(w.badge)) return false;
-    if (w.categoryScores.length === 0) return false;
-
+ 
+  const mapped = eligible.map((w) => ({
+    id: w.id,
+    user_id: w.user_id,
+    badge: w.badge,
+    reputation_score: w.reputation_score,
+    is_pro: w.is_pro,
+    categoryScores: [{ rating: w.categoryRating }],
+  }));
+ 
+  const filtered = mapped.filter((w) => {
     const estimatedFinish = new Date(
       now.getTime() + Number(order.estimated_hours) * 60 * 60 * 1000 + 60 * 60 * 1000
     );
     if (order.worker_deadline && estimatedFinish > order.worker_deadline) return false;
-
+ 
     return true;
   });
-
+ 
   const sorted = filtered.sort((a, b) => {
     const scoreA = calcMatchScore(a);
     const scoreB = calcMatchScore(b);
     return scoreB - scoreA;
   });
-
+ 
   return sorted.slice(0, 15);
 }
-
+ 
 // ─── Accept Order ─────────────────────────────────────────────────────────────
-
+ 
 export async function acceptOrder(orderId: string, workerUserId: string) {
   const lockKey = `order_lock:${orderId}`;
-  const locked = await redis.setnx(lockKey, workerUserId);
-
-  if (!locked) throw new Error("ORDER_ALREADY_TAKEN");
-
-  await redis.expire(lockKey, 300);
-
+  const locked = await redis.set(lockKey, workerUserId, "EX", 300, "NX");
+ 
+  if (locked !== "OK") throw new Error("ORDER_ALREADY_TAKEN");
+ 
   try {
     const workerProfile = await db.query.workerProfiles.findFirst({
       where: eq(workerProfiles.user_id, workerUserId),
     });
     if (!workerProfile) throw new Error("ORDER_NOT_AVAILABLE");
-
+ 
     let order: typeof orders.$inferSelect | undefined;
 
     await db.transaction(async (tx) => {

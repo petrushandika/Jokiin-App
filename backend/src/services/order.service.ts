@@ -125,8 +125,14 @@ export async function getOrderDetail(orderId: string, userId: string) {
 
 // ─── Approve Order ────────────────────────────────────────────────────────────
 
-export async function approveOrder(orderId: string, customerId: string) {
-  const order = await db.query.orders.findFirst({
+export async function approveOrder(
+  orderId: string,
+  customerId: string,
+  txClient?: Parameters<Parameters<typeof db.transaction>[0]>[0]
+) {
+  const client = txClient ?? db;
+
+  const order = await client.query.orders.findFirst({
     where: and(eq(orders.id, orderId), eq(orders.customer_id, customerId)),
   });
 
@@ -136,7 +142,7 @@ export async function approveOrder(orderId: string, customerId: string) {
   }
 
   // Only update order status here — escrow release is handled by releaseEscrow() in the route handler
-  await db
+  await client
     .update(orders)
     .set({ status: "completed", completed_at: new Date(), updated_at: new Date() })
     .where(eq(orders.id, orderId));
@@ -144,7 +150,7 @@ export async function approveOrder(orderId: string, customerId: string) {
   await reputationQueue.add("update-score", { orderId });
 
   // Notifikasi worker bahwa order disetujui
-  const fullOrder = await db.query.orders.findFirst({
+  const fullOrder = await client.query.orders.findFirst({
     where: eq(orders.id, orderId),
     with: { worker: true },
   });
